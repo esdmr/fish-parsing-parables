@@ -1,7 +1,14 @@
 import { defineConfig } from 'vite';
 
+function ensureTrailingSlash(url) {
+	return url.endsWith('/') ? url : url + '/';
+}
+
 export default defineConfig({
 	cacheDir: 'node_modules/.cache/vite',
+	base: ensureTrailingSlash(
+		process.env.FISH_BASE_URL ?? process.env.BASE_URL ?? '/',
+	),
 	build: {
 		target: ['firefox104', 'chrome104'],
 		outDir: 'build',
