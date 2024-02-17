@@ -55,7 +55,10 @@ function getCompletionTargets(source, targetIndex) {
 	const {previousSibling} = node;
 
 	if (
-		!(separatorTypes.has(type) && node.startIndex < targetIndex) &&
+		(
+			separatorTypes.has(type) && node.startIndex === targetIndex ||
+			node.startIndex > targetIndex
+		) &&
 		previousSibling?.type === 'command'
 	) {
 		return {tree, node, command: previousSibling};
