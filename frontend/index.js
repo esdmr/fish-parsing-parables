@@ -98,22 +98,31 @@ function showCompletionTargets() {
 		text += '\n\n\nnot in a command\n\n\n\n';
 	}
 
-	text += `\ntree:\n${debug(tree.rootNode)}\n`;
+	text += `\ntree:\n${debug(tree.rootNode.walk())}\n`;
 
 	pre.textContent = text.trimEnd();
 	tree.delete();
 }
 
 /**
- * @param {Parser.SyntaxNode} node
+ * @param {Parser.TreeCursor} cursor
  */
-function debug(node) {
-	const {type, children, startIndex, endIndex, text} = node;
-	const head = `${encode(type)}[${startIndex}-${endIndex}]`;
+function debug(cursor) {
+	const name = cursor.currentFieldName() ?? '';
+	const head = `${name ? `${name}, ` : ''}${encode(cursor.nodeType)}[${cursor.startIndex}-${cursor.endIndex}]`;
+	const children = [];
+
+	if (cursor.gotoFirstChild()) {
+		do {
+			children.push(debug(cursor));
+		} while (cursor.gotoNextSibling());
+
+		cursor.gotoParent();
+	}
 
 	return children.length ? `(${head}\n\t${
-		children.map((i) => debug(i).replaceAll('\n', '\n\t')).join('\n\t')
-	})` : `(${head} ${encode(text)})`;
+		children.map((i) => i.replaceAll('\n', '\n\t')).join('\n\t')
+	})` : `(${head}: ${encode(cursor.nodeText)})`;
 }
 
 function encode(value) {
