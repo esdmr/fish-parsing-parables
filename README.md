@@ -5,4 +5,4 @@ Experiment with Tree-sitter to parse `fish` scripts for
 This involves setting up the parser and
 [language](https://github.com/esdmr/tree-sitter-fish). The goal is to generate a
 string to be passed to `fish` to generate the completions, and to process its
-output while keeping as much as the input formatting.
+output while keeping as much input formatting as possible.
