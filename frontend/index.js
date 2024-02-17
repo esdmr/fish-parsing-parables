@@ -9,117 +9,146 @@ await Parser.init({
 });
 const fish = await Parser.Language.load(treeSitterFishWasm);
 
+const separatorTypes = new Set([
+	';',
+	'&',
+	'|',
+	'&&',
+	'||',
+	'\n',
+	'\r',
+	'\r\n',
+]);
+
 const parser = new Parser();
 parser.setLanguage(fish);
 
 const textarea = nonNullable(document.querySelector('textarea'));
 const pre = nonNullable(document.querySelector('pre'));
 
-textarea.addEventListener('input', updateParseTree);
-textarea.addEventListener('selectionchange', updateParseTree);
+textarea.addEventListener('input', showCompletionTargets);
+textarea.addEventListener('selectionchange', showCompletionTargets);
 
-function updateParseTree() {
-	let text = '';
-	const source = textarea.value;
+showCompletionTargets();
 
-	const targetIndex = textarea.selectionStart;
-	text += str`index:\t${targetIndex}\n`;
-	text += str`source:\t${source.slice(0, targetIndex)}\n`;
-
-	text += '\n';
-
+/**
+ * @param {string} source
+ * @param {number} targetIndex
+ */
+function getCompletionTargets(source, targetIndex) {
 	const tree = parser.parse(source.endsWith('\n') ? source : source + '\n');
-	text += str`tree:\t${tree.rootNode}\n`;
 
-	text += '\n';
+	const cursor = tree.rootNode.walk();
+	const node = gotoDescendantWithIndex(cursor, targetIndex).currentNode();
+	const command = gotoAncestorOfType(cursor, 'command')?.currentNode();
 
-	const node = findDescendant(tree.rootNode, targetIndex);
-	text += str`type:\t${node.type}\n`;
-	text += str`node:\t${source.slice(node.startIndex, targetIndex)}\n`;
-	text += str`start:\t${node.startIndex}${node.startIndex > targetIndex ? ' (cursor before)' : ''}\n`;
-	text += str`end:\t${node.endIndex}${node.endIndex < targetIndex ? ' (cursor after)' : ''}\n`;
-
-	text += '\n';
-
-	const command = findAncestor(node, 'command');
+	const {type} = node;
 
 	if (command) {
-		text += str`cmd:\t${source.slice(command.startIndex, targetIndex)}\n`;
-		text += str`start:\t${command.startIndex}${command.startIndex > targetIndex ? ' (cursor before)' : ''}\n`;
-		text += str`end:\t${command.endIndex}${command.endIndex < targetIndex ? ' (cursor after)' : ''}\n`;
+		const argument = type === 'variable_name'
+			? node
+			: gotoChildWithIndex(cursor, targetIndex)?.currentNode() ?? node;
 
-		text += '\n';
-
-		const arg = node.type === 'variable_name' ? node : findChild(command, targetIndex);
-		text += str`arg:\t${source.slice(arg.startIndex, targetIndex)}\n`;
-		text += str`start:\t${arg.startIndex}${arg.startIndex > targetIndex ? ' (cursor before)' : ''}\n`;
-		text += str`end:\t${arg.endIndex}${arg.endIndex < targetIndex ? ' (cursor after)' : ''}\n`;
-	} else {
-		text += str`\nnot in a command\n\n`;
-		text += '\n';
-
-		const previousSibling = node.previousSibling;
-
-		if (
-			((node.type !== ';' && node.type !== '\n') || node.startIndex >= targetIndex) &&
-			previousSibling?.type === 'command'
-		) {
-			console.log(previousSibling?.lastChild.text, previousSibling.text, previousSibling?.lastChild.endIndex === previousSibling.endIndex);
-			text += str`cmd:\t${source.slice(previousSibling.startIndex, targetIndex)}\n`;
-			text += str`start:\t${previousSibling.startIndex}\n`;
-			text += str`end:\t${previousSibling.endIndex}\n`;
-		} else {
-			text += str`\nnot after a command\n\n`;
-		}
+		return {tree, node, command, argument};
 	}
+
+	const {previousSibling} = node;
+
+	if (
+		!(separatorTypes.has(type) && node.startIndex < targetIndex) &&
+		previousSibling?.type === 'command'
+	) {
+		return {tree, node, command: previousSibling};
+	}
+
+	return {tree, node};
+}
+
+function showCompletionTargets() {
+	const source = textarea.value;
+
+	const targetIndex = textarea.selectionDirection === 'forward' ? textarea.selectionEnd : textarea.selectionStart;
+
+	const {tree, node, command, argument} = getCompletionTargets(source, targetIndex);
+
+	let text = '';
+	text += `index:\t${encode(targetIndex)}\n`;
+	text += `source:\t${encode(source.slice(0, targetIndex))}\n`;
+	text += '\n';
+	text += `type:\t${encode(node.type)}\n`;
+	text += `node:\t${encode(source.slice(node.startIndex, targetIndex))}\n`;
+	text += `start:\t${encode(node.startIndex)}${node.startIndex > targetIndex ? ' (cursor before)' : ''}\n`;
+	text += `end:\t${encode(node.endIndex)}\n`;
+	text += '\n';
+
+	if (command) {
+		text += `cmd:\t${encode(source.slice(command.startIndex, targetIndex))}\n`;
+		text += `start:\t${encode(command.startIndex)}${command.startIndex > targetIndex ? ' (cursor before)' : ''}\n`;
+		text += `end:\t${encode(command.endIndex)}\n`;
+
+		if (argument) {
+			text += '\n';
+			text += `arg:\t${encode(source.slice(argument.startIndex, targetIndex))}\n`;
+			text += `start:\t${encode(argument.startIndex)}${argument.startIndex > targetIndex ? ' (cursor before)' : ''}\n`;
+			text += `end:\t${encode(argument.endIndex)}\n`;
+		} else {
+			text += '\n\nnot in an argument\n\n';
+		}
+	} else {
+		text += '\n\n\nnot in a command\n\n\n\n';
+	}
+
+	text += `\ntree:\n${debug(tree.rootNode)}\n`;
 
 	pre.textContent = text.trimEnd();
-}
-
-function str(template, ...args) {
-	return String.raw({raw: template}, ...args.map(i => typeof i === 'string' ? JSON.stringify(i).slice(1, -1) : i));
+	tree.delete();
 }
 
 /**
  * @param {Parser.SyntaxNode} node
+ */
+function debug(node) {
+	const {type, children, startIndex, endIndex, text} = node;
+	const head = `${encode(type)}[${startIndex}-${endIndex}]`;
+
+	return children.length ? `(${head}\n\t${
+		children.map((i) => debug(i).replaceAll('\n', '\n\t')).join('\n\t')
+	})` : `(${head} ${encode(text)})`;
+}
+
+function encode(value) {
+	return typeof value === 'string' ? JSON.stringify(value).slice(1, -1) : value;
+}
+
+/**
+ * @param {Parser.TreeCursor} cursor
  * @param {number} targetIndex
  */
-function findDescendant(node, targetIndex) {
-	let isOutOfBounds;
-
-	while ((isOutOfBounds = node.nextSibling && node.endIndex < targetIndex) || node.firstChild) {
-		node = nonNullable(isOutOfBounds ? node.nextSibling : node.firstChild);
-	}
-
-	return node;
+function gotoDescendantWithIndex(cursor, targetIndex) {
+	while (
+		cursor.endIndex < targetIndex && cursor.gotoNextSibling() ||
+		cursor.gotoFirstChild()
+	);
+	return cursor;
 }
 
 /**
- * @param {Parser.SyntaxNode} node
+ * @param {Parser.TreeCursor} cursor
  * @param {number} targetIndex
  */
-function findChild(node, targetIndex) {
-	if (!node.firstChild) return node;
-	node = nonNullable(node.firstChild);
-
-	while (node.nextSibling && node.endIndex < targetIndex) {
-		node = nonNullable(node.nextSibling);
-	}
-
-	return node;
+function gotoChildWithIndex(cursor, targetIndex) {
+	if (!cursor.gotoFirstChild()) return;
+	while (cursor.endIndex < targetIndex && cursor.gotoNextSibling());
+	return cursor;
 }
 
 /**
- *
- * @param {Parser.SyntaxNode} node
+ * @param {Parser.TreeCursor} node
  * @param {string} type
  */
-function findAncestor(node, type) {
-	while (node.parent && node.type !== type) {
-		node = node.parent;
-	}
-
-	return node.type === type ? node : undefined;
+function gotoAncestorOfType(node, type) {
+	while (node.nodeType !== type && node.gotoParent());
+	return node.nodeType === type ? node : undefined;
 }
 
 /**
