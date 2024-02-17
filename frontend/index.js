@@ -76,19 +76,19 @@ function showCompletionTargets() {
 	text += `source:\t${encode(source.slice(0, targetIndex))}\n`;
 	text += '\n';
 	text += `type:\t${encode(node.type)}\n`;
-	text += `node:\t${encode(source.slice(node.startIndex, targetIndex))}\n`;
+	text += `node:\t${encode(source.slice(node.startIndex, Math.min(node.endIndex, targetIndex)))}\n`;
 	text += `start:\t${encode(node.startIndex)}${node.startIndex > targetIndex ? ' (cursor before)' : ''}\n`;
 	text += `end:\t${encode(node.endIndex)}\n`;
 	text += '\n';
 
 	if (command) {
-		text += `cmd:\t${encode(source.slice(command.startIndex, targetIndex))}\n`;
+		text += `cmd:\t${encode(source.slice(command.startIndex, Math.min(command.endIndex, targetIndex)))}\n`;
 		text += `start:\t${encode(command.startIndex)}${command.startIndex > targetIndex ? ' (cursor before)' : ''}\n`;
 		text += `end:\t${encode(command.endIndex)}\n`;
 
 		if (argument) {
 			text += '\n';
-			text += `arg:\t${encode(source.slice(argument.startIndex, targetIndex))}\n`;
+			text += `arg:\t${encode(source.slice(argument.startIndex, Math.min(argument.endIndex, targetIndex)))}\n`;
 			text += `start:\t${encode(argument.startIndex)}${argument.startIndex > targetIndex ? ' (cursor before)' : ''}\n`;
 			text += `end:\t${encode(argument.endIndex)}\n`;
 		} else {
