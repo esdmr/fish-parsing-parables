@@ -24,22 +24,32 @@ const parser = new Parser();
 parser.setLanguage(fish);
 
 const textarea = nonNullable(document.querySelector('textarea'));
+const completion = nonNullable(document.querySelector('input'));
 const pre = nonNullable(document.querySelector('pre'));
 
 textarea.addEventListener('input', showCompletionTargets);
 textarea.addEventListener('selectionchange', showCompletionTargets);
+completion.addEventListener('change', completeArgument);
 
 showCompletionTargets();
 
+function getSource() {
+	const source = textarea.value;
+
+	const index = textarea.selectionDirection === 'forward' ? textarea.selectionEnd : textarea.selectionStart;
+
+	return {source, index};
+}
+
 /**
  * @param {string} source
- * @param {number} targetIndex
+ * @param {number} index
  */
-function getCompletionTargets(source, targetIndex) {
+function getCompletionTargets(source, index) {
 	const tree = parser.parse(source.endsWith('\n') ? source : source + '\n');
 
 	const cursor = tree.rootNode.walk();
-	const node = gotoDescendantWithIndex(cursor, targetIndex).currentNode();
+	const node = gotoDescendantWithIndex(cursor, index).currentNode();
 	const command = gotoAncestorOfType(cursor, 'command')?.currentNode();
 
 	const {type} = node;
@@ -47,7 +57,7 @@ function getCompletionTargets(source, targetIndex) {
 	if (command) {
 		const argument = type === 'variable_name'
 			? node
-			: gotoChildWithIndex(cursor, targetIndex)?.currentNode() ?? node;
+			: gotoChildWithIndex(cursor, index)?.currentNode() ?? node;
 
 		return {tree, node, command, argument};
 	}
@@ -56,8 +66,8 @@ function getCompletionTargets(source, targetIndex) {
 
 	if (
 		(
-			separatorTypes.has(type) && node.startIndex === targetIndex ||
-			node.startIndex > targetIndex
+			separatorTypes.has(type) && node.startIndex === index ||
+			node.startIndex > index
 		) &&
 		previousSibling?.type === 'command'
 	) {
@@ -68,31 +78,28 @@ function getCompletionTargets(source, targetIndex) {
 }
 
 function showCompletionTargets() {
-	const source = textarea.value;
-
-	const targetIndex = textarea.selectionDirection === 'forward' ? textarea.selectionEnd : textarea.selectionStart;
-
-	const {tree, node, command, argument} = getCompletionTargets(source, targetIndex);
+	const {source, index} = getSource();
+	const {tree, node, command, argument} = getCompletionTargets(source, index);
 
 	let text = '';
-	text += `index:\t${encode(targetIndex)}\n`;
-	text += `source:\t${encode(source.slice(0, targetIndex))}\n`;
+	text += `index:\t${encode(index)}\n`;
+	text += `source:\t${encode(source.slice(0, index))}\n`;
 	text += '\n';
 	text += `type:\t${encode(node.type)}\n`;
-	text += `node:\t${encode(source.slice(node.startIndex, Math.min(node.endIndex, targetIndex)))}\n`;
-	text += `start:\t${encode(node.startIndex)}${node.startIndex > targetIndex ? ' (cursor before)' : ''}\n`;
+	text += `node:\t${encode(source.slice(node.startIndex, Math.min(node.endIndex, index)))}\n`;
+	text += `start:\t${encode(node.startIndex)}${node.startIndex > index ? ' (cursor before)' : ''}\n`;
 	text += `end:\t${encode(node.endIndex)}\n`;
 	text += '\n';
 
 	if (command) {
-		text += `cmd:\t${encode(source.slice(command.startIndex, Math.min(command.endIndex, targetIndex)))}\n`;
-		text += `start:\t${encode(command.startIndex)}${command.startIndex > targetIndex ? ' (cursor before)' : ''}\n`;
+		text += `cmd:\t${encode(source.slice(command.startIndex, Math.min(command.endIndex, index)))}\n`;
+		text += `start:\t${encode(command.startIndex)}${command.startIndex > index ? ' (cursor before)' : ''}\n`;
 		text += `end:\t${encode(command.endIndex)}\n`;
 
 		if (argument) {
 			text += '\n';
-			text += `arg:\t${encode(source.slice(argument.startIndex, Math.min(argument.endIndex, targetIndex)))}\n`;
-			text += `start:\t${encode(argument.startIndex)}${argument.startIndex > targetIndex ? ' (cursor before)' : ''}\n`;
+			text += `arg:\t${encode(source.slice(argument.startIndex, Math.min(argument.endIndex, index)))}\n`;
+			text += `start:\t${encode(argument.startIndex)}${argument.startIndex > index ? ' (cursor before)' : ''}\n`;
 			text += `end:\t${encode(argument.endIndex)}\n`;
 		} else {
 			text += '\n\nnot in an argument\n\n';
@@ -104,6 +111,22 @@ function showCompletionTargets() {
 	text += `\ntree:\n${debug(tree.rootNode.walk())}\n`;
 
 	pre.textContent = text.trimEnd();
+	tree.delete();
+}
+
+function completeArgument() {
+	const {source, index} = getSource();
+	const {tree, argument} = getCompletionTargets(source, index);
+	const {value} = completion;
+
+	const startIndex = Math.min(argument?.startIndex ?? source.length, index);
+	const oldEndIndex = Math.max(argument?.endIndex ?? 0, index);
+	const newEndIndex = startIndex + value.length;
+	const pre = source.slice(0, startIndex);
+	const post = source.slice(oldEndIndex);
+
+	textarea.value = pre + value + post;
+	textarea.setSelectionRange(newEndIndex, newEndIndex);
 	tree.delete();
 }
 
