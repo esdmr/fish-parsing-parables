@@ -50,36 +50,49 @@ function getCompletionTargets(source, index) {
 
 	const cursor = tree.rootNode.walk();
 	const node = gotoDescendantWithIndex(cursor, index).currentNode();
-	const command = gotoAncestorOfType(cursor, 'command')?.currentNode();
 
-	const {type} = node;
+	const ancestor = gotoAncestor(cursor, (c) =>
+		c.nodeType === 'command' ||
+		c.nodeType === 'variable_expansion' ||
+		c.nodeType === 'file_redirect' ||
+		c.nodeType === 'stream_redirect'
+	)?.currentNode();
+
+	const command = gotoAncestor(cursor, (c) => c.nodeType === 'command')?.currentNode();
 
 	if (command) {
-		const argument = type === 'variable_name'
-			? node
-			: gotoChildWithIndex(cursor, index)?.currentNode() ?? node;
+		let argument;
 
-		return {tree, node, command, argument};
+		if (
+			nonNullable(ancestor).type === 'variable_expansion' && nonNullable(ancestor?.firstChild).endIndex <= index ||
+			nonNullable(ancestor).type.endsWith('_redirect') && nonNullable(ancestor?.firstChild).endIndex <= index
+		) {
+			argument = nonNullable(ancestor).lastChild;
+		} else {
+			argument = gotoChildWithIndex(cursor, index)?.currentNode();
+		}
+
+		return {tree, node, command, argument, error: undefined};
 	}
-
-	const {previousSibling} = node;
 
 	if (
 		(
-			separatorTypes.has(type) && node.startIndex === index ||
+			separatorTypes.has(node.type) && node.startIndex === index ||
 			node.startIndex > index
 		) &&
-		previousSibling?.type === 'command'
+		node.previousSibling?.type === 'command'
 	) {
-		return {tree, node, command: previousSibling};
+		return {tree, node, command: node.previousSibling, argument: undefined, error: undefined};
 	}
 
-	return {tree, node};
+	const error = findErrorRoot(node);
+
+	return {tree, node, command: undefined, argument: undefined, error};
 }
 
 function showCompletionTargets() {
 	const {source, index} = getSource();
-	const {tree, node, command, argument} = getCompletionTargets(source, index);
+	const {tree, node, command, argument, error} = getCompletionTargets(source, index);
 
 	let text = '';
 	text += `index:\t${encode(index)}\n`;
@@ -104,6 +117,13 @@ function showCompletionTargets() {
 		} else {
 			text += '\n\nnot in an argument\n\n';
 		}
+	} else if (error) {
+		const errorText = encode(source.slice(error.startIndex, Math.min(error.endIndex, index)));
+
+		text += `error:\t${errorText}\n`;
+		text += `start:\t${encode(error.startIndex)}${error.startIndex > index ? ' (cursor before)' : ''}\n`;
+		text += `end:\t${encode(error.endIndex)}\n`;
+		text += '\n\nsyntax error\n\n';
 	} else {
 		text += '\n\n\nnot in a command\n\n\n\n';
 	}
@@ -178,12 +198,23 @@ function gotoChildWithIndex(cursor, targetIndex) {
 }
 
 /**
- * @param {Parser.TreeCursor} node
- * @param {string} type
+ * @param {Parser.TreeCursor} cursor
+ * @param {(cursor: Parser.TreeCursor) => boolean} fn
  */
-function gotoAncestorOfType(node, type) {
-	while (node.nodeType !== type && node.gotoParent());
-	return node.nodeType === type ? node : undefined;
+function gotoAncestor(cursor, fn) {
+	while (!fn(cursor) && cursor.gotoParent());
+	return fn(cursor) ? cursor : undefined;
+}
+
+/**
+ * @param {Parser.SyntaxNode} node
+ */
+function findErrorRoot(node) {
+	while (!node.hasError() && node.parent) {
+		node = node.parent;
+	}
+
+	return node.hasError() ? node : undefined;
 }
 
 /**
