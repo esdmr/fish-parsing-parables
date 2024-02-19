@@ -25,11 +25,12 @@ parser.setLanguage(fish);
 
 const textarea = nonNullable(document.querySelector('textarea'));
 const completion = nonNullable(document.querySelector('input'));
+const completionButton = nonNullable(document.querySelector('button'));
 const pre = nonNullable(document.querySelector('pre'));
 
 textarea.addEventListener('input', showCompletionTargets);
 textarea.addEventListener('selectionchange', showCompletionTargets);
-completion.addEventListener('change', completeArgument);
+completionButton.addEventListener('click', completeArgument);
 
 showCompletionTargets();
 
@@ -110,21 +111,27 @@ function showCompletionTargets() {
 		text += `end:\t${encode(command.endIndex)}\n`;
 
 		if (argument) {
+			const argumentText = encode(source.slice(argument.startIndex, Math.min(argument.endIndex, index)));
+			completion.value = argumentText;
+
 			text += '\n';
-			text += `arg:\t${encode(source.slice(argument.startIndex, Math.min(argument.endIndex, index)))}\n`;
+			text += `arg:\t${argumentText}\n`;
 			text += `start:\t${encode(argument.startIndex)}${argument.startIndex > index ? ' (cursor before)' : ''}\n`;
 			text += `end:\t${encode(argument.endIndex)}\n`;
 		} else {
+			completion.value = '';
 			text += '\n\nnot in an argument\n\n';
 		}
 	} else if (error) {
 		const errorText = encode(source.slice(error.startIndex, Math.min(error.endIndex, index)));
+		completion.value = errorText;
 
 		text += `error:\t${errorText}\n`;
 		text += `start:\t${encode(error.startIndex)}${error.startIndex > index ? ' (cursor before)' : ''}\n`;
 		text += `end:\t${encode(error.endIndex)}\n`;
 		text += '\n\nsyntax error\n\n';
 	} else {
+		completion.value = '';
 		text += '\n\n\nnot in a command\n\n\n\n';
 	}
 
@@ -134,7 +141,9 @@ function showCompletionTargets() {
 	tree.delete();
 }
 
-function completeArgument() {
+function completeArgument(event) {
+	event.preventDefault();
+
 	const {source, index} = getSource();
 	const {tree, argument} = getCompletionTargets(source, index);
 	const {value} = completion;
