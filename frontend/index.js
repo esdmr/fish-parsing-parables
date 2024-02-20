@@ -111,11 +111,11 @@ function showCompletionTargets() {
 		text += `end:\t${encode(command.endIndex)}\n`;
 
 		if (argument) {
-			const argumentText = encode(source.slice(argument.startIndex, Math.min(argument.endIndex, index)));
+			const argumentText = source.slice(argument.startIndex, Math.min(argument.endIndex, index));
 			completion.value = argumentText;
 
 			text += '\n';
-			text += `arg:\t${argumentText}\n`;
+			text += `arg:\t${encode(argumentText)}\n`;
 			text += `start:\t${encode(argument.startIndex)}${argument.startIndex > index ? ' (cursor before)' : ''}\n`;
 			text += `end:\t${encode(argument.endIndex)}\n`;
 		} else {
@@ -123,10 +123,10 @@ function showCompletionTargets() {
 			text += '\n\nnot in an argument\n\n';
 		}
 	} else if (error) {
-		const errorText = encode(source.slice(error.startIndex, Math.min(error.endIndex, index)));
+		const errorText = source.slice(error.startIndex, Math.min(error.endIndex, index));
 		completion.value = errorText;
 
-		text += `error:\t${errorText}\n`;
+		text += `error:\t${encode(errorText)}\n`;
 		text += `start:\t${encode(error.startIndex)}${error.startIndex > index ? ' (cursor before)' : ''}\n`;
 		text += `end:\t${encode(error.endIndex)}\n`;
 		text += '\n\nsyntax error\n\n';
