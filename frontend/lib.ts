@@ -23,13 +23,7 @@ const separatorTypes = new Set([
 const parser = new Parser();
 parser.setLanguage(fish);
 
-/**
-* @template T
-* @param {T | null | undefined} i
-* @param {string} [what]
-* @returns {T}
-*/
-export function nonNullable(i, what) {
+export function nonNullable<T>(i: T | null | undefined, what?: string): T {
 	if (i === undefined || i === null) {
 		throw new TypeError(`Assertion Error: nullish value ${what}`);
 	}
@@ -37,15 +31,11 @@ export function nonNullable(i, what) {
    return i;
 }
 
-/**
- * @param {Parser.SyntaxNode} node
- * @param {number} targetIndex
- */
-function getNodesAtIndex(node, targetIndex) {
+function getNodesAtIndex(node: Parser.SyntaxNode, targetIndex: number) {
 	const cursor = node.walk();
 
 	try {
-		const nodes = [];
+		const nodes: Parser.SyntaxNode[] = [];
 		while (true) {
 			if (cursor.endIndex < targetIndex && cursor.gotoNextSibling()) continue;
 			nodes.push(cursor.currentNode());
@@ -57,11 +47,7 @@ function getNodesAtIndex(node, targetIndex) {
 	}
 }
 
-/**
- * @param {string} source
- * @param {number} index
- */
-export function getCompletionTargets(source, index) {
+export function getCompletionTargets(source: string, index: number) {
 	const tree = parser.parse(source.endsWith('\n') ? source : source + '\n');
 
 	const nodes = getNodesAtIndex(tree.rootNode, index);

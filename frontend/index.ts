@@ -64,13 +64,13 @@ function showCompletionTargets() {
 		text += '\n\n\nnot in a command\n\n\n\n';
 	}
 
-	text += `\ntree:\n${debug(tree.rootNode.walk())}\n`;
+	text += `\ntree:\n${nodeToString(tree.rootNode)}\n`;
 
 	pre.textContent = text.trimEnd();
 	tree.delete();
 }
 
-function completeArgument(event) {
+function completeArgument(event: Event) {
 	event.preventDefault();
 
 	const {source, index} = getSource();
@@ -88,17 +88,14 @@ function completeArgument(event) {
 	tree.delete();
 }
 
-/**
- * @param {Parser.TreeCursor} cursor
- */
-function debug(cursor) {
+function cursorToString(cursor: Parser.TreeCursor) {
 	const name = cursor.currentFieldName() ?? '';
 	const head = `${name ? `${name}: (` : '('}${cursor.nodeIsMissing ? 'missing ' : ''}${encode(cursor.nodeType)}[${cursor.startIndex}-${cursor.endIndex}]: ${encode(cursor.nodeText)}`;
-	const children = [];
+	const children: string[] = [];
 
 	if (cursor.gotoFirstChild()) {
 		do {
-			children.push(debug(cursor));
+			children.push(cursorToString(cursor));
 		} while (cursor.gotoNextSibling());
 
 		cursor.gotoParent();
@@ -109,6 +106,16 @@ function debug(cursor) {
 	})` : `${head})`;
 }
 
-function encode(value) {
-	return typeof value === 'string' ? JSON.stringify(value).slice(1, -1) : value;
+function nodeToString(node: Parser.SyntaxNode) {
+	const cursor = node.walk();
+
+	try {
+		return cursorToString(cursor);
+	} finally {
+		cursor.delete();
+	}
+}
+
+function encode(value: unknown) {
+	return typeof value === 'string' ? JSON.stringify(value).slice(1, -1) : JSON.stringify(value);
 }
