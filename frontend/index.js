@@ -93,7 +93,7 @@ function completeArgument(event) {
  */
 function debug(cursor) {
 	const name = cursor.currentFieldName() ?? '';
-	const head = `${name ? `${name}, ` : ''}${encode(cursor.nodeType)}[${cursor.startIndex}-${cursor.endIndex}]: ${encode(cursor.nodeText)}`;
+	const head = `${name ? `${name}: (` : '('}${cursor.nodeIsMissing ? 'missing ' : ''}${encode(cursor.nodeType)}[${cursor.startIndex}-${cursor.endIndex}]: ${encode(cursor.nodeText)}`;
 	const children = [];
 
 	if (cursor.gotoFirstChild()) {
@@ -104,9 +104,9 @@ function debug(cursor) {
 		cursor.gotoParent();
 	}
 
-	return children.length ? `(${head}\n\t${
+	return children.length ? `${head}\n\t${
 		children.map((i) => i.replaceAll('\n', '\n\t')).join('\n\t')
-	})` : `(${head})`;
+	})` : `${head})`;
 }
 
 function encode(value) {
