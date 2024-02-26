@@ -30,53 +30,31 @@ parser.setLanguage(fish);
 * @returns {T}
 */
 export function nonNullable(i, what) {
-   if (i === undefined || i === null) {
-	   throw new TypeError(`Assertion Error: nullish value ${what}`);
-   }
+	if (i === undefined || i === null) {
+		throw new TypeError(`Assertion Error: nullish value ${what}`);
+	}
 
    return i;
 }
 
 /**
- * @param {Parser.TreeCursor} cursor
- * @param {number} targetIndex
- */
-function gotoDescendantWithIndex(cursor, targetIndex) {
-	while (
-		cursor.endIndex < targetIndex && cursor.gotoNextSibling() ||
-		cursor.gotoFirstChild()
-	);
-	return cursor;
-}
-
-/**
- * @param {Parser.TreeCursor} cursor
- * @param {number} targetIndex
- */
-function gotoChildWithIndex(cursor, targetIndex) {
-	if (!cursor.gotoFirstChild()) return;
-	while (cursor.endIndex < targetIndex && cursor.gotoNextSibling());
-	return cursor;
-}
-
-/**
- * @param {Parser.TreeCursor} cursor
- * @param {(cursor: Parser.TreeCursor) => boolean} fn
- */
-function gotoAncestor(cursor, fn) {
-	while (!fn(cursor) && cursor.gotoParent());
-	return fn(cursor) ? cursor : undefined;
-}
-
-/**
  * @param {Parser.SyntaxNode} node
+ * @param {number} targetIndex
  */
-function findErrorRoot(node) {
-	while (!node.hasError() && node.parent) {
-		node = node.parent;
-	}
+function getNodesAtIndex(node, targetIndex) {
+	const cursor = node.walk();
 
-	return node.hasError() ? node : undefined;
+	try {
+		const nodes = [];
+		while (true) {
+			if (cursor.endIndex < targetIndex && cursor.gotoNextSibling()) continue;
+			nodes.push(cursor.currentNode());
+			if (!cursor.gotoFirstChild()) break;
+		}
+		return nodes;
+	} finally {
+		cursor.delete();
+	}
 }
 
 /**
@@ -84,19 +62,20 @@ function findErrorRoot(node) {
  * @param {number} index
  */
 export function getCompletionTargets(source, index) {
-	const tree = parser.parse(source);
+	const tree = parser.parse(source.endsWith('\n') ? source : source + '\n');
 
-	const cursor = tree.rootNode.walk();
-	const node = gotoDescendantWithIndex(cursor, index).currentNode();
+	const nodes = getNodesAtIndex(tree.rootNode, index);
+	const node = nonNullable(nodes.at(-1));
 
-	const ancestor = gotoAncestor(cursor, (c) =>
-		c.nodeType === 'command' ||
-		c.nodeType === 'variable_expansion' ||
-		c.nodeType === 'file_redirect' ||
-		c.nodeType === 'stream_redirect'
-	)?.currentNode();
+	const ancestor = nodes.findLast((n) =>
+		n.type === 'command' ||
+		n.type === 'variable_expansion' ||
+		n.type === 'file_redirect' ||
+		n.type === 'stream_redirect'
+	);
 
-	const command = gotoAncestor(cursor, (c) => c.nodeType === 'command')?.currentNode();
+	const commandIndex = nodes.findLastIndex(n => n.type === 'command');
+	const command = nodes[commandIndex];
 
 	if (command) {
 		let argument;
@@ -107,7 +86,7 @@ export function getCompletionTargets(source, index) {
 		) {
 			argument = nonNullable(ancestor).lastChild ?? undefined;
 		} else {
-			argument = gotoChildWithIndex(cursor, index)?.currentNode();
+			argument = nodes[commandIndex + 1];
 		}
 
 		return {tree, node, command, argument, error: undefined};
@@ -123,7 +102,7 @@ export function getCompletionTargets(source, index) {
 		return {tree, node, command: node.previousSibling, argument: undefined, error: undefined};
 	}
 
-	const error = findErrorRoot(node);
+	const error = nodes.findLast(i => i.hasError());
 
 	return {tree, node, command: undefined, argument: undefined, error};
 }
