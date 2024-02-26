@@ -1,0 +1,9 @@
+{
+	"compilerOptions": {
+		"target": "ESNext",
+		"module": "node16",
+		"checkJs": true,
+		"strictNullChecks": true,
+		"noEmit": true
+	}
+}
