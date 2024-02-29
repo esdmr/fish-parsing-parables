@@ -47,6 +47,31 @@ function getNodesAtIndex(node: Parser.SyntaxNode, targetIndex: number) {
 	}
 }
 
+export class CompletionTarget {
+	static forCommand(node: Parser.SyntaxNode, command: Parser.SyntaxNode, argument?: Parser.SyntaxNode) {
+		return new CompletionTarget(node, command, argument, undefined);
+	}
+
+	static forError(node: Parser.SyntaxNode, error: Parser.SyntaxNode) {
+		return new CompletionTarget(node, undefined, undefined, error);
+	}
+
+	static forOutsideOfCommand(node: Parser.SyntaxNode) {
+		return new CompletionTarget(node, undefined, undefined, undefined);
+	}
+
+	get tree() {
+		return this.node.tree;
+	}
+
+	constructor(
+		readonly node: Parser.SyntaxNode,
+		readonly command: Parser.SyntaxNode | undefined,
+		readonly argument: Parser.SyntaxNode | undefined,
+		readonly error: Parser.SyntaxNode | undefined,
+	) {}
+}
+
 export function getCompletionTargets(source: string, index: number) {
 	const tree = parser.parse(source.endsWith('\n') ? source : source + '\n');
 
@@ -75,7 +100,7 @@ export function getCompletionTargets(source: string, index: number) {
 			argument = nodes[commandIndex + 1];
 		}
 
-		return {tree, node, command, argument, error: undefined};
+		return CompletionTarget.forCommand(node, command, argument);
 	}
 
 	if (
@@ -85,10 +110,14 @@ export function getCompletionTargets(source: string, index: number) {
 		) &&
 		node.previousSibling?.type === 'command'
 	) {
-		return {tree, node, command: node.previousSibling, argument: undefined, error: undefined};
+		return CompletionTarget.forCommand(node, node.previousSibling);
 	}
 
 	const error = nodes.findLast(i => i.hasError());
 
-	return {tree, node, command: undefined, argument: undefined, error};
+	if (error) {
+		return CompletionTarget.forError(node, error);
+	}
+
+	return CompletionTarget.forOutsideOfCommand(node);
 }
