@@ -113,7 +113,7 @@ export function getCompletionTargets(source: string, index: number) {
 		return CompletionTarget.forCommand(node, node.previousSibling);
 	}
 
-	const error = nodes.findLast(i => i.hasError());
+	const error = nodes.findLast(i => i.type === 'ERROR');
 
 	if (error) {
 		return CompletionTarget.forError(node, error);
