@@ -2,7 +2,8 @@
 	"private": true,
 	"type": "module",
 	"scripts": {
-		"rollup": "rollup -c"
+		"rollup": "rollup -c",
+		"start": "pnpm run rollup && node build/index.js"
 	},
 	"dependencies": {
 		"@esdmr/tree-sitter-fish": "^3.5.1",

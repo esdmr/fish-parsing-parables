@@ -13,8 +13,17 @@
 		</style>
 	</head>
 	<body>
-		<div><textarea autocomplete="off" autocapitalize="false"></textarea></div>
-		<form><input autocomplete="off" autocapitalize="false"><button>Replace</button></form>
+		<div><textarea autocomplete="off" autocapitalize="false"></textarea>
+		</div>
+		<form>
+			<div><label>Completion text <input id="completion"
+						autocomplete="off" autocapitalize="false"></label></div>
+			<div><label>From index <input type="number" id="from"
+						autocomplete="off" autocapitalize="false"></label></div>
+			<div><label>To index <input type="number" id="to" autocomplete="off"
+						autocapitalize="false"></label></div>
+			<div><button>Complete</button></div>
+		</form>
 		<pre></pre>
 	</body>
 </html>

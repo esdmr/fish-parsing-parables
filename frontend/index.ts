@@ -1,14 +1,16 @@
 import Parser from 'web-tree-sitter';
-import { getCompletionTargets, nonNullable } from './lib.js';
+import { getCompletionTargets, nonNullable, parse } from './lib.js';
 
 const textarea = nonNullable(document.querySelector('textarea'));
-const completion = nonNullable(document.querySelector('input'));
-const completionButton = nonNullable(document.querySelector('button'));
+const inputCompletion = nonNullable(document.querySelector<HTMLInputElement>('#completion'));
+const inputFrom = nonNullable(document.querySelector<HTMLInputElement>('#from'));
+const inputTo = nonNullable(document.querySelector<HTMLInputElement>('#to'));
+const buttonComplete = nonNullable(document.querySelector('button'));
 const pre = nonNullable(document.querySelector('pre'));
 
 textarea.addEventListener('input', showCompletionTargets);
 textarea.addEventListener('selectionchange', showCompletionTargets);
-completionButton.addEventListener('click', completeArgument);
+buttonComplete.addEventListener('click', completeArgument);
 
 showCompletionTargets();
 
@@ -22,70 +24,47 @@ function getSource() {
 
 function showCompletionTargets() {
 	const {source, index} = getSource();
-	const {tree, node, command, argument, error} = getCompletionTargets(source, index);
+	const tree = parse(source);
 
-	let text = '';
-	text += `index:\t${encode(index)}\n`;
-	text += `source:\t${encode(source.slice(0, index))}\n`;
-	text += '\n';
-	text += `type:\t${encode(node.type)}\n`;
-	text += `node:\t${encode(source.slice(node.startIndex, Math.min(node.endIndex, index)))}\n`;
-	text += `start:\t${encode(node.startIndex)}${node.startIndex > index ? ' (cursor before)' : ''}\n`;
-	text += `end:\t${encode(node.endIndex)}\n`;
-	text += '\n';
+	try {
+		const target = getCompletionTargets(tree, index);
+		pre.textContent = `${JSON.stringify(target, null, '\t')}\n\n${nodeToString(tree.rootNode)}`;
 
-	if (command) {
-		text += `cmd:\t${encode(source.slice(command.startIndex, Math.min(command.endIndex, index)))}\n`;
-		text += `start:\t${encode(command.startIndex)}${command.startIndex > index ? ' (cursor before)' : ''}\n`;
-		text += `end:\t${encode(command.endIndex)}\n`;
-
-		if (argument) {
-			const argumentText = source.slice(argument.startIndex, Math.min(argument.endIndex, index));
-			completion.value = argumentText;
-
-			text += '\n';
-			text += `arg:\t${encode(argumentText)}\n`;
-			text += `start:\t${encode(argument.startIndex)}${argument.startIndex > index ? ' (cursor before)' : ''}\n`;
-			text += `end:\t${encode(argument.endIndex)}\n`;
+		if (target.type === 'error') {
+			inputCompletion.value = '';
+			inputFrom.value = String(target.error.startIndex);
+		} else if (target.type === 'inside' && target.argument) {
+			inputCompletion.value = source.slice(
+				Math.min(target.argument.startIndex, index),
+				Math.min(target.argument.endIndex, index),
+			);
+			inputFrom.value = String(Math.min(target.argument.startIndex, index));
+			inputTo.value = String(Math.max(target.argument.endIndex, index));
 		} else {
-			completion.value = '';
-			text += '\n\nnot in an argument\n\n';
+			inputCompletion.value = '';
+			inputFrom.value = String(index);
+			inputTo.value = String(index);
 		}
-	} else if (error) {
-		const errorText = source.slice(error.startIndex, Math.min(error.endIndex, index));
-		completion.value = errorText;
-
-		text += `error:\t${encode(errorText)}\n`;
-		text += `start:\t${encode(error.startIndex)}${error.startIndex > index ? ' (cursor before)' : ''}\n`;
-		text += `end:\t${encode(error.endIndex)}\n`;
-		text += '\n\nsyntax error\n\n';
-	} else {
-		completion.value = '';
-		text += '\n\n\nnot in a command\n\n\n\n';
+	} finally {
+		tree.delete();
 	}
-
-	text += `\ntree:\n${nodeToString(tree.rootNode)}\n`;
-
-	pre.textContent = text.trimEnd();
-	tree.delete();
 }
 
 function completeArgument(event: Event) {
 	event.preventDefault();
 
-	const {source, index} = getSource();
-	const {tree, argument} = getCompletionTargets(source, index);
-	const {value} = completion;
+	const {source} = getSource();
+	const {value} = inputCompletion;
 
-	const startIndex = Math.min(argument?.startIndex ?? source.length, index);
-	const oldEndIndex = Math.max(argument?.endIndex ?? 0, index);
+	const startIndex = inputFrom.valueAsNumber;
+	const oldEndIndex = inputTo.valueAsNumber;
 	const newEndIndex = startIndex + value.length;
 	const pre = source.slice(0, startIndex);
 	const post = source.slice(oldEndIndex);
 
 	textarea.value = pre + value + post;
 	textarea.setSelectionRange(newEndIndex, newEndIndex);
-	tree.delete();
+	showCompletionTargets();
 }
 
 function cursorToString(cursor: Parser.TreeCursor) {
