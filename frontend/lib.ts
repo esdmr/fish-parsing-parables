@@ -20,6 +20,18 @@ const separatorTypes = new Set([
 	'\r\n',
 ]);
 
+const keywordCommands = new Set([
+	'begin',
+	'else',
+	'end',
+	'for',
+	'in',
+	'function',
+	'if',
+	'switch',
+	'while',
+]);
+
 const pairs = [
 	['function', 'end'],
 	['switch', 'end'],
@@ -168,6 +180,20 @@ export function getCompletionTargets(tree: Parser.Tree, index: number, correctio
 				startIndex: argument.startIndex,
 				endIndex: argument.endIndex,
 			} : undefined,
+		};
+	}
+
+	if (keywordCommands.has(node.type) && node.startIndex <= index && node.endIndex >= index) {
+		return {
+			type: 'inside',
+			command: {
+				startIndex: node.startIndex,
+				endIndex: node.endIndex,
+			},
+			argument: {
+				startIndex: node.startIndex,
+				endIndex: node.endIndex,
+			},
 		};
 	}
 
