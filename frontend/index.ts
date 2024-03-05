@@ -1,5 +1,4 @@
-import Parser from 'web-tree-sitter';
-import { getCompletionTargets, nonNullable, parse } from './lib.js';
+import { getCompletionTargets, nodeToString, nonNullable, parse } from './lib.js';
 
 const textarea = nonNullable(document.querySelector('textarea'));
 const inputCompletion = nonNullable(document.querySelector<HTMLInputElement>('#completion'));
@@ -65,36 +64,4 @@ function completeArgument(event: Event) {
 	textarea.value = pre + value + post;
 	textarea.setSelectionRange(newEndIndex, newEndIndex);
 	showCompletionTargets();
-}
-
-function cursorToString(cursor: Parser.TreeCursor) {
-	const name = cursor.currentFieldName() ?? '';
-	const head = `${name ? `${name}: (` : '('}${cursor.nodeIsMissing ? 'missing ' : ''}${encode(cursor.nodeType)}[${cursor.startIndex}-${cursor.endIndex}]: ${encode(cursor.nodeText)}`;
-	const children: string[] = [];
-
-	if (cursor.gotoFirstChild()) {
-		do {
-			children.push(cursorToString(cursor));
-		} while (cursor.gotoNextSibling());
-
-		cursor.gotoParent();
-	}
-
-	return children.length ? `${head}\n\t${
-		children.map((i) => i.replaceAll('\n', '\n\t')).join('\n\t')
-	})` : `${head})`;
-}
-
-function nodeToString(node: Parser.SyntaxNode) {
-	const cursor = node.walk();
-
-	try {
-		return cursorToString(cursor);
-	} finally {
-		cursor.delete();
-	}
-}
-
-function encode(value: unknown) {
-	return typeof value === 'string' ? JSON.stringify(value).slice(1, -1) : JSON.stringify(value);
 }
