@@ -240,11 +240,12 @@ function tryCorrectingError(error: Parser.SyntaxNode, index: number, correctionD
 
 	const source = nonNullable(sources.get(error.tree));
 	const textParts: string[] = [];
-	let oldIndex = error.startIndex;
-	const mapping = new Map<number, number>([[-1, -oldIndex]]);
-	let newIndex = oldIndex;
+	const {startIndex} = error;
+	const mapping = new Map<number, number>([[-1, -startIndex]]);
+	let oldIndex = startIndex;
+	let newIndex = 0;
 	let hasCorrection = false;
-	index -= oldIndex;
+	index -= startIndex;
 
 	for (const i of iterateChildrenOfErrorWithCorrection(error)) {
 		if (typeof i === 'string') {
