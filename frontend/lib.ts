@@ -255,8 +255,9 @@ function tryCorrectingError(error: Parser.SyntaxNode, index: number, correctionD
 			newIndex += i.length;
 			hasCorrection = true;
 		} else {
-			newIndex += i - oldIndex;
-			textParts.push(source.slice(oldIndex, oldIndex = i));
+			const text = source.slice(oldIndex, oldIndex = i);
+			newIndex += text.length;
+			textParts.push(text);
 		}
 	}
 
@@ -266,6 +267,7 @@ function tryCorrectingError(error: Parser.SyntaxNode, index: number, correctionD
 
 	try {
 		const target = getCompletionTargets(tree, index, correctionDepth + 1);
+		console.log(nodeToString(tree.rootNode), {target, index, textParts, mapping});
 
 		switch (target.type) {
 			case 'inside': {
