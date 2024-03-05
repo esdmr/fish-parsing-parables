@@ -244,6 +244,7 @@ function tryCorrectingError(error: Parser.SyntaxNode, index: number, correctionD
 	const mapping = new Map<number, number>([[-1, -oldIndex]]);
 	let newIndex = oldIndex;
 	let hasCorrection = false;
+	index -= oldIndex;
 
 	for (const i of iterateChildrenOfErrorWithCorrection(error)) {
 		if (typeof i === 'string') {
@@ -263,7 +264,6 @@ function tryCorrectingError(error: Parser.SyntaxNode, index: number, correctionD
 	const tree = parse(textParts.join(''));
 
 	try {
-		console.log(String(tree.rootNode), textParts.join(''), source);
 		const target = getCompletionTargets(tree, index, correctionDepth + 1);
 
 		switch (target.type) {
