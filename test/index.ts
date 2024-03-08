@@ -1,4 +1,5 @@
-import {CompletionTarget, getCompletionTargets, parse} from '../frontend/lib.js';
+import {CompletionTarget, getCompletionTargets} from '../frontend/lib/complete.js';
+import {parse} from '../frontend/lib/parse.js';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 
@@ -104,6 +105,11 @@ for (const line of file.split('\n').values()) {
 
 	switch (kind) {
 		case '<': {
+			assert.equal(commandStartIndex, undefined, `Command start must not be defined, in ${name}`);
+			assert.equal(commandEndIndex, undefined, `Command end must not be defined, in ${name}`);
+			assert.equal(argumentStartIndex, undefined, `Argument start must not be defined, in ${name}`);
+			assert.equal(argumentEndIndex, undefined, `Argument end must not be defined, in ${name}`);
+
 			tests.push({
 				name,
 				input: {
@@ -118,9 +124,9 @@ for (const line of file.split('\n').values()) {
 		}
 
 		case '=': {
-			assert.notEqual(commandStartIndex, undefined, `Command start must be defined in ${name}`);
-			assert.notEqual(commandEndIndex, undefined, `Unmatched command delimiter in ${name}`);
-			assert.equal(argumentStartIndex === undefined, argumentEndIndex === undefined, `Unmatched argument delimiter in ${name}`);
+			assert.notEqual(commandStartIndex, undefined, `Command start must be defined, in ${name}`);
+			assert.notEqual(commandEndIndex, undefined, `Unmatched command delimiter, in ${name}`);
+			assert.equal(argumentStartIndex === undefined, argumentEndIndex === undefined, `Unmatched argument delimiter, in ${name}`);
 
 			tests.push({
 				name,
@@ -144,8 +150,10 @@ for (const line of file.split('\n').values()) {
 		}
 
 		case '>': {
-			assert.notEqual(commandStartIndex, undefined, `Command start must be defined in ${name}`);
-			assert.notEqual(commandEndIndex, undefined, `Unmatched command delimiter in ${name}`);
+			assert.notEqual(commandStartIndex, undefined, `Command start must be defined, in ${name}`);
+			assert.notEqual(commandEndIndex, undefined, `Unmatched command delimiter, in ${name}`);
+			assert.equal(argumentStartIndex, undefined, `Argument start must not be defined, in ${name}`);
+			assert.equal(argumentEndIndex, undefined, `Argument end must not be defined, in ${name}`);
 
 			tests.push({
 				name,
@@ -165,8 +173,10 @@ for (const line of file.split('\n').values()) {
 		}
 
 		case '?': {
-			assert.notEqual(commandStartIndex, undefined, `Error start must be defined in ${name}`);
-			assert.notEqual(commandEndIndex, undefined, `Unmatched error delimiter in ${name}`);
+			assert.notEqual(commandStartIndex, undefined, `Error start must be defined, in ${name}`);
+			assert.notEqual(commandEndIndex, undefined, `Unmatched error delimiter, in ${name}`);
+			assert.equal(argumentStartIndex, undefined, `Argument start must not be defined, in ${name}`);
+			assert.equal(argumentEndIndex, undefined, `Argument end must not be defined, in ${name}`);
 
 			tests.push({
 				name,
@@ -187,6 +197,8 @@ for (const line of file.split('\n').values()) {
 	}
 }
 
+let failures = 0;
+
 for (const test of tests) {
 	try {
 		runTest(test);
@@ -194,5 +206,8 @@ for (const test of tests) {
 	} catch (error) {
 		console.error('ERROR', test.name, error);
 		console.log('FAIL', test.name);
+		failures++;
 	}
 }
+
+console.log(tests.length, 'test cases,', failures, 'failures.');

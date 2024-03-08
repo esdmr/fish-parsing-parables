@@ -1,4 +1,7 @@
-import { getCompletionTargets, nodeToString, nonNullable, parse } from './lib.js';
+import { getCompletionTargets } from './lib/complete.js';
+import { nodeToString } from './lib/debug.js';
+import { parse } from './lib/parse.js';
+import { nonNullable } from './lib/utils.js';
 
 const textarea = nonNullable(document.querySelector('textarea'));
 const inputCompletion = nonNullable(document.querySelector<HTMLInputElement>('#completion'));
