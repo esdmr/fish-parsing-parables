@@ -29,7 +29,14 @@ const keywordCommands = new Set([
 	'function',
 	'if',
 	'switch',
+	'case',
 	'while',
+	'break',
+	'continue',
+	'return',
+	'not',
+	'and',
+	'or',
 ]);
 
 const pairs = [
