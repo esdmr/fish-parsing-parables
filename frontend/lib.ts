@@ -80,6 +80,27 @@ function getNodesAtIndex(node: Parser.SyntaxNode, targetIndex: number) {
 	}
 }
 
+function getNextSibling(node_: Parser.SyntaxNode) {
+	let node: Parser.SyntaxNode | null = node_;
+
+	do {
+		const {nextSibling} = node;
+		if (nextSibling) return nextSibling;
+		node = node.parent;
+	} while (node);
+}
+
+function getFirstLeaf(node: Parser.SyntaxNode) {
+	let cursor = node.walk();
+
+	try {
+		while (cursor.gotoFirstChild());
+		return cursor.currentNode();
+	} finally {
+		cursor.delete();
+	}
+}
+
 function* iterateChildrenOfError(error: Parser.SyntaxNode): Generator<Parser.SyntaxNode> {
 	for (const child of error.children) {
 		if (child.type === 'ERROR') {
@@ -135,6 +156,13 @@ export function parse(source: string) {
 
 export type Range = {startIndex: number, endIndex: number};
 
+export function getRange(node: Range): Range {
+	return {
+		startIndex: node.startIndex,
+		endIndex: node.endIndex,
+	};
+}
+
 export type CompletionTarget = (
 	| {type: 'inside', command: Range, argument: Range | undefined}
 	| {type: 'beside', command: Range}
@@ -172,28 +200,16 @@ export function getCompletionTargets(tree: Parser.Tree, index: number, correctio
 
 		return {
 			type: 'inside',
-			command: {
-				startIndex: command.startIndex,
-				endIndex: command.endIndex,
-			},
-			argument: argument && argument.startIndex <= index ? {
-				startIndex: argument.startIndex,
-				endIndex: argument.endIndex,
-			} : undefined,
+			command: getRange(command),
+			argument: argument && argument.startIndex <= index ? getRange(argument) : undefined,
 		};
 	}
 
 	if (keywordCommands.has(node.type) && node.startIndex <= index && node.endIndex >= index) {
 		return {
 			type: 'inside',
-			command: {
-				startIndex: node.startIndex,
-				endIndex: node.endIndex,
-			},
-			argument: {
-				startIndex: node.startIndex,
-				endIndex: node.endIndex,
-			},
+			command: getRange(node),
+			argument: getRange(node),
 		};
 	}
 
@@ -206,11 +222,35 @@ export function getCompletionTargets(tree: Parser.Tree, index: number, correctio
 	) {
 		return {
 			type: 'beside',
-			command: {
-				startIndex: node.previousSibling.startIndex,
-				endIndex: node.previousSibling.endIndex,
-			},
+			command: getRange(node.previousSibling),
 		};
+	}
+
+	const nextSibling = getNextSibling(node);
+
+	if (
+		nextSibling &&
+		nextSibling.startIndex <= index
+	) {
+		if (nextSibling.type === 'command') {
+			const argument = nextSibling.firstChild;
+
+			return {
+				type: 'inside',
+				command: getRange(nextSibling),
+				argument: argument ? getRange(argument) : undefined,
+			};
+		}
+
+		const nextLeaf = getFirstLeaf(nextSibling);
+
+		if (keywordCommands.has(nextLeaf.type)) {
+			return {
+				type: 'inside',
+				command: getRange(nextLeaf),
+				argument: nextLeaf ? getRange(nextLeaf) : undefined,
+			};
+		}
 	}
 
 	if (node.startIndex > index) {
@@ -224,10 +264,7 @@ export function getCompletionTargets(tree: Parser.Tree, index: number, correctio
 			tryCorrectingError(error, index, correctionDepth) ??
 			{
 				type: 'error',
-				error: {
-					startIndex: error.startIndex,
-					endIndex: error.endIndex,
-				},
+				error: getRange(error),
 			}
 		);
 	}
@@ -267,29 +304,19 @@ function tryCorrectingError(error: Parser.SyntaxNode, index: number, correctionD
 
 	try {
 		const target = getCompletionTargets(tree, index, correctionDepth + 1);
-		console.log(nodeToString(tree.rootNode), {target, index, textParts, mapping});
 
 		switch (target.type) {
 			case 'inside': {
 				return {
 					type: 'inside',
-					command: {
-						startIndex: mapIndex(target.command.startIndex, mapping),
-						endIndex: mapIndex(target.command.endIndex, mapping),
-					},
-					argument: target.argument && {
-						startIndex: mapIndex(target.argument.startIndex, mapping),
-						endIndex: mapIndex(target.argument.endIndex, mapping),
-					},
+					command: mapRange(target.command, mapping),
+					argument: target.argument && mapRange(target.argument, mapping),
 				};
 			}
 			case 'beside': {
 				return {
 					type: 'beside',
-					command: {
-						startIndex: mapIndex(target.command.startIndex, mapping),
-						endIndex: mapIndex(target.command.endIndex, mapping),
-					},
+					command: mapRange(target.command, mapping),
 				};
 			}
 			case 'outside': {
@@ -298,10 +325,7 @@ function tryCorrectingError(error: Parser.SyntaxNode, index: number, correctionD
 			case 'error': {
 				return {
 					type: 'error',
-					error: {
-						startIndex: mapIndex(target.error.startIndex, mapping),
-						endIndex: mapIndex(target.error.endIndex, mapping),
-					},
+					error: mapRange(target.error, mapping),
 				};
 			}
 		}
@@ -319,6 +343,13 @@ function mapIndex(newIndex: number, mapping: Map<number, number>) {
 	}
 
 	return oldIndex;
+}
+
+function mapRange(range: Range, mapping: Map<number, number>): Range {
+	return {
+		startIndex: mapIndex(range.startIndex, mapping),
+		endIndex: mapIndex(range.endIndex, mapping),
+	};
 }
 
 export function cursorToString(cursor: Parser.TreeCursor) {
