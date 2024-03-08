@@ -47,7 +47,7 @@ const pairs = [
 ] as [string, string][];
 
 const endOfPairs = new Map(pairs.map(([a, b]) => [a, b.match(/\w/) ? `\n${b}` : b]));
-const startOfPairs = new Map(pairs.map(([a, b]) => [b, a.match(/\w/) ? `\n${a}` : a]));
+const startOfPairs = new Map(pairs.map(([a, b]) => [b, a.match(/\w/) ? `${a}\n` : a]));
 const symmetricPairs = new Set(pairs.filter(([a, b]) => a === b).map(([a]) => a));
 
 const parser = new Parser();
