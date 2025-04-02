@@ -1,5 +1,9 @@
 # `fish` parsing parables
 
+I have changed my mind and this project is no longer needed. See [esdmr/fish-completion#209](https://github.com/esdmr/fish-completion/issues/209).
+
+---
+
 Experiment with Tree-sitter to parse `fish` scripts for
 [esdmr/fish-completion#209](https://github.com/esdmr/fish-completion/issues/209).
 Also see [tree-sitter-fish](https://github.com/esdmr/tree-sitter-fish). The goal
